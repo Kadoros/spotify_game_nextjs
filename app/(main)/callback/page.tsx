@@ -1,17 +1,22 @@
 "use client";
 
 import { useEffect } from "react";
-import { useSpotifyAuth } from "@/hooks/useSpotifyAuth";
+import { useSearchParams } from "next/navigation";
+import { useSpotifyAuth } from "@/context/SpotifyAuthContext";
 
 export default function Callback() {
-  const { handleCallback, loading, profile } = useSpotifyAuth();
+  const searchParams = useSearchParams();
+  const { handleCallback, loading } = useSpotifyAuth();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    handleCallback(params);
-  }, [handleCallback]);
+    if (searchParams.get("code")) {
+      handleCallback(searchParams);
+    }
+  }, [searchParams, handleCallback]);
 
-  if (loading) return <p>Loading...</p>;
-
-  return <div>Welcome, {profile?.display_name || "user"}</div>;
+  return (
+    <div className="text-white text-center p-10">
+      {loading ? "Authenticating with Spotify..." : "Redirecting..."}
+    </div>
+  );
 }

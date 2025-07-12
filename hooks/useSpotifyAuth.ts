@@ -11,19 +11,42 @@ export function useSpotifyAuth() {
 
   const router = useRouter();
 
+    const fetchProfile = useCallback(async (accessToken: string) => {
+    const profileRes = await fetch("https://api.spotify.com/v1/me", {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!profileRes.ok) {
+      throw new Error(await profileRes.text());
+    }
+    
+
+    const profileData: UserProfile = await profileRes.json();
+    setProfile(profileData);
+    console.log(profile);
+
+    return profileData;
+  }, []);
+
   useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    setIsSignedIn(!!token);
-   if (token) {
-    // load profile on mount
+  const token = localStorage.getItem("access_token");
+
+  if (token) {
+    setIsSignedIn(true);
+
+    // fetch profile again on mount
     fetchProfile(token).catch((e) => {
-      console.error("Failed to fetch profile on mount:", e);
+      console.error("Failed to load profile:", e);
       setIsSignedIn(false);
       setProfile(null);
       localStorage.removeItem("access_token");
     });
+  } else {
+    setIsSignedIn(false);
+    setProfile(null);
   }
-  }, []);
+}, [fetchProfile]);
+
 
   const login = async () => {
     const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!;
@@ -78,22 +101,7 @@ export function useSpotifyAuth() {
     return tokenData.access_token;
   }, []);
 
-  const fetchProfile = useCallback(async (accessToken: string) => {
-    const profileRes = await fetch("https://api.spotify.com/v1/me", {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    });
 
-    if (!profileRes.ok) {
-      throw new Error(await profileRes.text());
-    }
-    
-
-    const profileData: UserProfile = await profileRes.json();
-    setProfile(profileData);
-    console.log(profile);
-
-    return profileData;
-  }, []);
 
   // You can remove getProfile or keep if you want to fetch profile by URL params later
   
@@ -112,7 +120,8 @@ export function useSpotifyAuth() {
         }
 
         const accessToken = await getToken(code, verifier);
-        await fetchProfile(accessToken);
+        const profile = await fetchProfile(accessToken);
+        setProfile(profile);
         router.push("/");
       } catch (error: any) {
         console.error("Error in handleCallback:", error);
