@@ -61,7 +61,7 @@ const MainLayout = ({ children }: { children: React.ReactNode }) => {
         )}
       </header>
 
-      <main className="flex-1 overflow-y-auto px-4">{children}</main>
+      <main className="flex-1 overflow-y-auto px-4 h-full">{children}</main>
     </div>
   );
 };

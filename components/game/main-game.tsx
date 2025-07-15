@@ -5,13 +5,7 @@ import React, { useEffect, useState } from "react";
 import SpotifyGrid from "./spotify-grid";
 import { useSpotifyApi } from "@/context/SpotifyApiContext";
 import { useSpotifyAuth } from "@/context/SpotifyAuthContext";
-
-interface Track {
-  id: string;
-  name: string;
-  uri: string;
-  artists: { name: string }[];
-}
+import { TrackObject } from "@/types";
 
 interface MainGameProps {
   rounds: number;
@@ -22,9 +16,9 @@ export default function MainGame({ rounds, term }: MainGameProps) {
   const { getTopTracks, getRecommendations, error, hasToken } = useSpotifyApi();
   const { isSignedIn, login } = useSpotifyAuth();
 
-  const [topTracks, setTopTracks] = useState<Track[]>([]);
+  const [topTracks, setTopTracks] = useState<TrackObject[]>([]);
   const [recommendations, setRecommendations] = useState<
-    Record<string, Track[]>
+    Record<string, TrackObject[]>
   >({});
   const [loading, setLoading] = useState(true);
 
@@ -34,7 +28,7 @@ export default function MainGame({ rounds, term }: MainGameProps) {
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
 
-  const [roundTracks, setRoundTracks] = useState<Track[]>([]);
+  const [roundTracks, setRoundTracks] = useState<TrackObject[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
 
@@ -58,7 +52,7 @@ export default function MainGame({ rounds, term }: MainGameProps) {
       }
       setTopTracks(tops);
 
-      const recs: Record<string, Track[]> = {};
+      const recs: Record<string, TrackObject[]> = {};
       await Promise.all(
         tops.map(async (track) => {
           const rec = await getRecommendations({
@@ -166,7 +160,7 @@ export default function MainGame({ rounds, term }: MainGameProps) {
   }
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
+    <div className="flex flex-col p-4 max-w-4xl mx-auto h-full ">
       <div className="mb-4 flex justify-between text-lg font-semibold">
         <div>
           Round: {currentRound + 1} / {rounds}
@@ -174,13 +168,14 @@ export default function MainGame({ rounds, term }: MainGameProps) {
         <div>Lives: {lives}</div>
         <div>Score: {score}</div>
       </div>
-
-      <SpotifyGrid
-        tracks={roundTracks}
-        selectedTrackId={selectedTrackId}
-        isCorrect={isCorrect}
-        onSelect={handleSelect}
-      />
+      <div className="h-full ">
+        <SpotifyGrid
+          tracks={roundTracks}
+          selectedTrackId={selectedTrackId}
+          isCorrect={isCorrect}
+          onSelect={handleSelect}
+        />
+      </div>
     </div>
   );
 }

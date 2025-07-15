@@ -1,19 +1,9 @@
 "use client";
+import PreviewBtn from "@/components/game/preview-btn";
 import React from "react";
 
-const page = () => {
-  return (
-    <div>
-      <iframe
-        src="https://open.spotify.com/embed/track/7ouMYWpwJ422jRcDASZB7P"
-        width="300"
-        height="80"
-        frameBorder="0"
-        // allowtransparency="true"
-        allow="encrypted-media"
-      ></iframe>
-    </div>
-  );
+const Page = () => {
+  return <PreviewBtn trackId="7ouMYWpwJ422jRcDASZB7P" />;
 };
 
-export default page;
+export default Page;
