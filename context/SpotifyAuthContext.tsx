@@ -10,6 +10,8 @@ import React, {
 import { useRouter } from "next/navigation";
 import { generateCodeVerifier, generateCodeChallenge } from "@/lib/spotify";
 import { UserProfile } from "@/types";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 interface SpotifyAuthContextType {
   isSignedIn: boolean;
@@ -68,24 +70,59 @@ export const SpotifyAuthProvider = ({
     return data;
   };
 
-  const handleCallback = useCallback(async (params: URLSearchParams) => {
-    setLoading(true);
-    try {
-      const code = params.get("code");
-      const verifier = localStorage.getItem("verifier");
-      if (!code || !verifier) throw new Error("Missing code or verifier");
+  const updateSpotifyToken = useMutation(api.users.updateSpotifyToken);
 
-      const token = await getToken(code, verifier);
-      await fetchProfile(token);
-      router.push("/");
-    } catch (err) {
-      console.error(err);
-      setIsSignedIn(false);
-      setProfile(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const handleCallback = useCallback(
+    async (params: URLSearchParams) => {
+      setLoading(true);
+      try {
+        const code = params.get("code");
+        const verifier = localStorage.getItem("verifier");
+        if (!code || !verifier) throw new Error("Missing code or verifier");
+
+        // Request token from Spotify
+        const body = new URLSearchParams({
+          client_id: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!,
+          grant_type: "authorization_code",
+          code,
+          redirect_uri: process.env.NEXT_PUBLIC_REDIRECT_URI!,
+          code_verifier: verifier,
+        });
+
+        const res = await fetch("https://accounts.spotify.com/api/token", {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body,
+        });
+
+        const data = await res.json();
+        if (!res.ok)
+          throw new Error(data.error_description || "Failed to get token");
+
+        // Save tokens in localStorage as before
+        localStorage.setItem("access_token", data.access_token);
+
+        // Also update tokens in Convex backend database
+        await updateSpotifyToken({
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token,
+          expiresIn: data.expires_in,
+        });
+
+        // Fetch and set profile
+        await fetchProfile(data.access_token);
+
+        router.push("/");
+      } catch (err) {
+        console.error(err);
+        setIsSignedIn(false);
+        setProfile(null);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [updateSpotifyToken, router]
+  );
 
   const login = async () => {
     const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!;

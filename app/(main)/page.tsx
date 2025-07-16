@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSpotifyAuth } from "@/context/SpotifyAuthContext";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { TermAndRoundSelector } from "@/components/game/term-and-round-selector";
+import { useUser } from "@clerk/clerk-react";
+import { useMutation } from "convex/react";
+import { api } from "@/convex/_generated/api";
 
 export default function Home() {
   const router = useRouter();
@@ -14,6 +17,18 @@ export default function Home() {
     "short_term"
   );
   const [rounds, setRounds] = useState<number>(5);
+
+  const { user } = useUser();
+  const createUser = useMutation(api.users.createUser);
+
+  useEffect(() => {
+    if (user) {
+      createUser({
+        name: user.fullName ?? undefined,
+        email: user.emailAddresses[0]?.emailAddress ?? undefined,
+      });
+    }
+  }, [user, createUser]);
 
   const handleStart = () => {
     // Example: pass term and rounds as query params if you want

@@ -6,6 +6,7 @@ import SpotifyGrid from "./spotify-grid";
 import { useSpotifyApi } from "@/context/SpotifyApiContext";
 import { useSpotifyAuth } from "@/context/SpotifyAuthContext";
 import { TrackObject } from "@/types";
+import GameScoreBoard from "./game-score-board";
 
 interface MainGameProps {
   rounds: number;
@@ -150,12 +151,12 @@ export default function MainGame({ rounds, term }: MainGameProps) {
 
   if (gameOver) {
     return (
-      <div className="p-8 text-center">
-        <h2 className="text-3xl font-bold mb-4">Game Over!</h2>
-        <p className="mb-2">
-          Your score: {score} / {rounds}
-        </p>
-      </div>
+      <GameScoreBoard
+        round={currentRound + 1}
+        totalRounds={rounds}
+        lives={lives}
+        score={score}
+      />
     );
   }
 
