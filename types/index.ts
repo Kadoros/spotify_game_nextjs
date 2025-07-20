@@ -95,6 +95,15 @@ export interface TrackGroup {
   answer: string;
 }
 
+// In your types.ts
+import { Id } from "@/convex/_generated/dataModel";
+
+export interface ConvexTrackObject extends TrackObject {
+  _id: Id<"tracks">;
+  _creationTime: number;
+}
+
+
 // Global augmentation for Spotify Web Playback SDK
 declare global {
   interface Window {

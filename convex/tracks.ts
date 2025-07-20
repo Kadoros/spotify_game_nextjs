@@ -96,18 +96,37 @@ export const createTrack = mutation({
   },
 });
 
-export const getTrack = query({
+export const getTrackById = query({
   args: {
-    id: v.string(),
+    trackId: v.string(),
   },
   handler: async (ctx, args) => {
     const track = await ctx.db
       .query("tracks")
-      .withIndex("by_trackId", (q) => q.eq("trackId", args.id))
+      .withIndex("by_trackId", (q) => q.eq("trackId", args.trackId))
       .unique();
 
     if (!track) throw new Error("Track not found");
 
     return track;
+  },
+});
+
+export const getTracksByIds = query({
+  args: {
+    trackIds: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const tracks = await Promise.all(
+      args.trackIds.map(async (trackId) => {
+        return await ctx.db
+          .query("tracks")
+          .withIndex("by_trackId", (q) => q.eq("trackId", trackId))
+          .unique();
+      })
+    );
+
+    // Filter out null values (tracks not found) and return only existing tracks
+    return tracks.filter((track) => track !== null);
   },
 });

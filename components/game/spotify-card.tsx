@@ -65,7 +65,7 @@ export function SpotifyCard({
           {/* Preview Button */}
           <div className="">
             <div className="">
-              <PreviewBtn trackId={track.id} />
+              <PreviewBtn trackId={track.trackId} />
             </div>
           </div>
         </div>

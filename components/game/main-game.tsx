@@ -1,80 +1,41 @@
-// components/game/main-game.tsx
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import SpotifyGrid from "./spotify-grid";
-import { TrackObject, TrackGroup } from "@/types";
 import GameScoreBoard from "./game-score-board";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
-import { useSpotifyApi } from "@/context/SpotifyApiContext"; // Import the context
+import { TrackObject } from "@/types";
 
 interface MainGameProps {
   gameId: string;
 }
 
 export default function MainGame({ gameId }: MainGameProps) {
-  // Fetch game data from Convex
   const gameData = useQuery(api.games.getGameById, {
     gameId: gameId as Id<"games">,
   });
-
-  // Get Spotify API functions
-  const { getTrackById } = useSpotifyApi();
 
   const [currentRound, setCurrentRound] = useState(0);
   const [lives, setLives] = useState(5);
   const [wrongCount, setWrongCount] = useState(0);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
-
-  const [roundTracks, setRoundTracks] = useState<TrackObject[]>([]);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  // Fetch tracks for the current round
-  useEffect(() => {
-    const fetchRoundTracks = async () => {
-      if (!gameData?.trackGroups || !gameData.trackGroups[currentRound]) {
-        setLoading(false);
-        return;
-      }
-
-      setLoading(true);
-      try {
-        const currentTrackGroup = gameData.trackGroups[currentRound];
-        const trackPromises = currentTrackGroup.options.map((trackId) =>
-          getTrackById(trackId)
-        );
-
-        const tracks = await Promise.all(trackPromises);
-
-        // Filter out any null results
-        const validTracks = tracks.filter((track) => track !== null);
-
-        setRoundTracks(validTracks);
-      } catch (error) {
-        console.error("Failed to fetch round tracks:", error);
-        setRoundTracks([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (gameData?.trackGroups) {
-      fetchRoundTracks();
-    }
-  }, [gameData, currentRound, getTrackById]);
+  const currentTrackGroup = gameData?.trackGroups?.[currentRound];
+  const roundTracks = useQuery(api.tracks.getTracksByIds, {
+    trackIds: (currentTrackGroup?.options || []) as Id<"tracks">[],
+  });
 
   function handleSelect(trackId: string) {
     if (selectedTrackId && isCorrect !== null) return;
-    if (!gameData?.trackGroups) return;
+    if (!currentTrackGroup || !gameData) return;
 
     setSelectedTrackId(trackId);
 
-    const currentTrackGroup = gameData.trackGroups[currentRound];
     const correct = trackId === currentTrackGroup.answer;
     setIsCorrect(correct);
 
@@ -107,8 +68,7 @@ export default function MainGame({ gameId }: MainGameProps) {
     }
   }
 
-  // Loading state
-  if (gameData === undefined || loading) {
+  if (gameData === undefined || roundTracks === undefined) {
     return (
       <div className="flex items-center justify-center p-8 h-64">
         <div className="text-center">
@@ -119,7 +79,6 @@ export default function MainGame({ gameId }: MainGameProps) {
     );
   }
 
-  // Game not found
   if (gameData === null) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
@@ -128,8 +87,7 @@ export default function MainGame({ gameId }: MainGameProps) {
     );
   }
 
-  // No tracks loaded yet
-  if (roundTracks.length === 0 && !loading) {
+  if (!roundTracks || roundTracks.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
         <p className="mb-4 text-lg">Failed to load tracks for this round.</p>
@@ -167,7 +125,7 @@ export default function MainGame({ gameId }: MainGameProps) {
       </div>
       <div className="h-full">
         <SpotifyGrid
-          tracks={roundTracks}
+          tracks={roundTracks as TrackObject[]} // Cast if needed
           selectedTrackId={selectedTrackId}
           isCorrect={isCorrect}
           onSelect={handleSelect}

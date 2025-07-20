@@ -21,13 +21,13 @@ export default function SpotifyGrid({
       <div className="grid grid-cols-2 gap-4">
         {tracks.slice(0, 4).map((track, idx) => (
           <SpotifyCard
-            key={track.id}
+            key={track.trackId}
             track={track}
             label={String.fromCharCode(65 + idx)} // A, B, C, D
-            onClick={() => onSelect(track.id)}
-            isSelected={selectedTrackId === track.id}
-            isCorrect={isCorrect === true && selectedTrackId === track.id}
-            isWrong={isCorrect === false && selectedTrackId === track.id}
+            onClick={() => onSelect(track.trackId)}
+            isSelected={selectedTrackId === track.trackId}
+            isCorrect={isCorrect === true && selectedTrackId === track.trackId}
+            isWrong={isCorrect === false && selectedTrackId === track.trackId}
           />
         ))}
       </div>
