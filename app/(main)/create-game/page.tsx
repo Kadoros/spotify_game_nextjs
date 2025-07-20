@@ -9,24 +9,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { api } from "@/convex/_generated/api";
 import { useSpotifyApi } from "@/context/SpotifyApiContext";
-import { TrackGroup } from "@/types";
+import { TrackGroup, TrackObject } from "@/types";
 import { toast } from "sonner";
 
 export default function CreateGamePage() {
   const router = useRouter();
   const { isLoading } = useConvexAuth();
 
-  const [gameId, setGameId] = useState("");
-
-  useEffect(() => {
-    if (isLoading) {
-      // 로딩 중이면 여기서 로딩 페이지 로직을 처리할 수 있습니다
-      console.log("Loading authentication...");
-    }
-  }, [isLoading]);
+  const [gameId, setGameId] = useState<string>("");
 
   const userData = useQuery(api.users.getUser);
   const createGame = useMutation(api.games.createGame);
+  const createTrack = useMutation(api.tracks.createTrack);
 
   const accessToken = useMemo(
     () => userData?.spotifyAccessToken ?? null,
@@ -37,23 +31,15 @@ export default function CreateGamePage() {
     [userData]
   );
 
-  // Handle loading and redirect logic
   useEffect(() => {
-    // Wait for Convex authentication to complete first
-    if (isLoading) return;
-
-    // Then wait for user data to load
-    if (userData === undefined) return;
-
-    // Only redirect after both are loaded and if tokens are missing
+    if (isLoading || userData === undefined) return;
     if (!accessToken || !refreshToken) {
       router.replace("/connect-spotify");
     }
-  }, [isLoading, accessToken, refreshToken, router, userData]);
+  }, [isLoading, userData, accessToken, refreshToken, router]);
 
   const [lives, setLives] = useState(3);
   const [rounds, setRounds] = useState(5);
-
   const [activeTerm, setActiveTerm] = useState<"short" | "middle" | "long">(
     "short"
   );
@@ -61,8 +47,7 @@ export default function CreateGamePage() {
   const { getTopTracks, getRecommendations } = useSpotifyApi();
 
   const handleMake = useCallback(async (): Promise<void> => {
-    // Don't allow game creation if still loading
-    if (isLoading || userData === undefined) return;
+    if (isLoading || userData === undefined || !accessToken) return;
 
     const termMap: Record<
       "short" | "middle" | "long",
@@ -74,8 +59,8 @@ export default function CreateGamePage() {
     };
 
     try {
-      const topTracks: any[] | null = await getTopTracks(
-        accessToken!,
+      const topTracks = await getTopTracks(
+        accessToken,
         rounds,
         termMap[activeTerm]
       );
@@ -83,40 +68,59 @@ export default function CreateGamePage() {
         throw new Error("Not enough top tracks found.");
       }
 
+      const allTrackObjects: TrackObject[] = [];
+
       const trackGroups: TrackGroup[] = await Promise.all(
-        topTracks.map(async (track): Promise<TrackGroup> => {
-          const recs: any[] | null = await getRecommendations(accessToken!, {
-            seed_tracks: track.id,
+        topTracks.map(async (track: TrackObject): Promise<TrackGroup> => {
+          const recs = await getRecommendations(accessToken, {
+            seed_tracks: track.trackId,
             limit: 10,
           });
 
           const fakes = (recs ?? [])
-            .filter((r: any) => r.id !== track.id)
+            .filter((r) => r.trackId !== track.trackId)
             .slice(0, 3);
 
           if (fakes.length < 3) {
             throw new Error("Not enough fake tracks found.");
           }
 
-          const options: string[] = [
-            track.id,
-            ...fakes.map((t: any) => t.id),
-          ].sort(() => Math.random() - 0.5);
+          const options = [track, ...fakes];
+          options.forEach((t) => {
+            if (!allTrackObjects.find((obj) => obj.trackId === t.trackId)) {
+              allTrackObjects.push(t);
+            }
+          });
 
           return {
-            options,
-            answer: track.id,
+            options: options.map((t) => t.trackId),
+            answer: track.trackId,
           };
         })
       );
 
-      // Call createGame mutation
-      const game = await createGame({ trackGroups, lives });
-      setGameId(game);
-      // Redirect to the game page by link or id
+      for (const trackObject of allTrackObjects) {
+        await createTrack({
+          trackObject: {
+            ...trackObject,
+            preview_url: trackObject.preview_url ?? undefined,
+            album: {
+              ...trackObject.album,
+              images: trackObject.album.images.map((img) => ({
+                url: img.url,
+                height: img.height ?? undefined,
+                width: img.width ?? undefined,
+              })),
+            },
+          },
+        });
+      }
+
+      const newGameId = await createGame({ trackGroups, lives });
+      setGameId(newGameId);
     } catch (err: any) {
       console.error("Failed to create game:", err);
-      toast.error("Error creating game. Try again.");
+      toast.error(err.message || "Error creating game. Try again.");
     }
   }, [
     rounds,
@@ -125,13 +129,14 @@ export default function CreateGamePage() {
     getTopTracks,
     getRecommendations,
     createGame,
-    router,
+    createTrack,
     isLoading,
     userData,
+    accessToken,
   ]);
 
   const handleCopyLink = useCallback(() => {
-    // Get the base URL from router
+    if (!gameId) return;
     const protocol = window.location.protocol;
     const host = window.location.host;
     const shareLink = `${protocol}//${host}/game/${gameId}`;
@@ -147,10 +152,10 @@ export default function CreateGamePage() {
   }, [gameId]);
 
   const handlePreviewGame = useCallback(() => {
+    if (!gameId) return;
     router.push(`/game/${gameId}`);
   }, [gameId, router]);
 
-  // Show loading while Convex is loading or user data is loading
   if (isLoading || userData === undefined) {
     return (
       <div className="text-white text-center p-10">
@@ -172,6 +177,7 @@ export default function CreateGamePage() {
               className="bg-black/40 border-white/20 text-white"
               value={lives}
               onChange={(e) => setLives(Number(e.target.value))}
+              min={1}
             />
           </div>
 
@@ -182,6 +188,7 @@ export default function CreateGamePage() {
               className="bg-black/40 border-white/20 text-white"
               value={rounds}
               onChange={(e) => setRounds(Number(e.target.value))}
+              min={1}
             />
           </div>
 
@@ -198,7 +205,7 @@ export default function CreateGamePage() {
                       : "bg-black/40 border-white/10 hover:bg-gray-700"
                   }`}
                 >
-                  {term.replace("_", " ")} Term
+                  {term} Term
                 </Button>
               ))}
             </div>
@@ -207,7 +214,7 @@ export default function CreateGamePage() {
           <Button
             className="w-full hover:bg-gray-700"
             onClick={handleMake}
-            disabled={isLoading || userData === undefined}
+            disabled={isLoading || userData === undefined || !accessToken}
           >
             Create Game
           </Button>

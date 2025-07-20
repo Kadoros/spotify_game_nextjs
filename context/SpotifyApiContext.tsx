@@ -1,6 +1,7 @@
 "use client";
 
 import { api } from "@/convex/_generated/api";
+import { TrackObject } from "@/types";
 import { useMutation, useQuery } from "convex/react";
 import React, {
   createContext,
@@ -16,30 +17,30 @@ interface SpotifyApiContextType {
     token: string,
     num: number,
     time_range?: "short_term" | "medium_term" | "long_term"
-  ) => Promise<any[] | null>;
-  getTrackById: (token: string, trackId: string) => Promise<any | null>;
+  ) => Promise<TrackObject[] | null>;
+  getTrackById: (token: string, trackId: string) => Promise<TrackObject | null>;
 
   // 새로운 추천 함수들
   getRecommendations: (
     token: string,
     options: Record<string, any>
-  ) => Promise<any[] | null>;
+  ) => Promise<TrackObject[] | null>;
   getRelatedArtists: (token: string, artistId: string) => Promise<any[] | null>;
   getArtistTopTracks: (
     token: string,
     artistId: string,
     market?: string
-  ) => Promise<any[] | null>;
+  ) => Promise<TrackObject[] | null>;
   searchByGenre: (
     token: string,
     genre: string,
     limit?: number
-  ) => Promise<any[] | null>;
+  ) => Promise<TrackObject[] | null>;
   searchSimilarTracks: (
     token: string,
     trackId: string,
     limit?: number
-  ) => Promise<any[] | null>;
+  ) => Promise<TrackObject[] | null>;
 
   loading: boolean;
   error: string | null;
@@ -52,6 +53,76 @@ const SpotifyApiContext = createContext<SpotifyApiContextType | undefined>(
 export function SpotifyApiProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Helper to normalize Spotify track data to TrackObject format
+  const normalizeTrackObject = (track: any): TrackObject => {
+    return {
+      album: {
+        album_type: track.album?.album_type || "unknown",
+        total_tracks: track.album?.total_tracks || 1,
+        available_markets: track.album?.available_markets || [],
+        external_urls: {
+          spotify: track.album?.external_urls?.spotify || "",
+        },
+        href: track.album?.href || "",
+        id: track.album?.id || "",
+        images: (track.album?.images || []).map((img: any) => ({
+          url: img.url,
+          height: img.height || null,
+          width: img.width || null,
+        })),
+        name: track.album?.name || "Unknown Album",
+        release_date: track.album?.release_date || "2024-01-01",
+        release_date_precision: track.album?.release_date_precision || "day",
+        type: track.album?.type || "album",
+        uri: track.album?.uri || "",
+      },
+      artists: (track.artists || []).map((artist: any) => ({
+        external_urls: {
+          spotify: artist.external_urls?.spotify || "",
+        },
+        href: artist.href || "",
+        id: artist.id || "",
+        name: artist.name || "Unknown Artist",
+        type: artist.type || "artist",
+        uri: artist.uri || "",
+      })),
+      available_markets: track.available_markets || [],
+      disc_number: track.disc_number || 1,
+      duration_ms: track.duration_ms || 0,
+      explicit: track.explicit || false,
+      external_ids: track.external_ids || {},
+      external_urls: {
+        spotify: track.external_urls?.spotify || "",
+      },
+      href: track.href || "",
+      trackId: track.id || "",
+      is_playable: track.is_playable !== false,
+      linked_from: track.linked_from
+        ? {
+            external_urls: {
+              spotify: track.linked_from.external_urls?.spotify || "",
+            },
+            href: track.linked_from.href || "",
+            id: track.linked_from.id || "",
+            type: track.linked_from.type || "",
+            uri: track.linked_from.uri || "",
+          }
+        : undefined,
+      restrictions: track.restrictions
+        ? {
+            reason: track.restrictions.reason || "",
+          }
+        : undefined,
+      name: track.name || "Unknown Track",
+      popularity: track.popularity || 0,
+      preview_url: track.preview_url || null,
+      track_number: track.track_number || 1,
+      type: "track" as const,
+      uri: track.uri || "",
+      is_local: track.is_local || false,
+    };
+  };
 
   // Helper to call Spotify Web API with automatic token refresh
   const fetchWebApi = useCallback(
@@ -83,7 +154,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
             // setToken(newToken);
 
             // Retry the request with the new token
-            return await fetchWebApi(endpoint, method, body, 1);
+            return await fetchWebApi(token, endpoint, method, body, 1);
           } catch (refreshError) {
             throw new Error("Token expired. Please log in again.");
           }
@@ -102,7 +173,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       token: string,
       num: number,
       time_range: "short_term" | "medium_term" | "long_term" = "short_term"
-    ): Promise<any[] | null> => {
+    ): Promise<TrackObject[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -115,7 +186,8 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
           token,
           `me/top/tracks?limit=${num}&time_range=${time_range}`
         );
-        return data.items ?? null;
+        const tracks = data.items || [];
+        return tracks.map(normalizeTrackObject);
       } catch (err: any) {
         setError(err.message || "Failed to fetch top tracks");
         return null;
@@ -123,11 +195,11 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, normalizeTrackObject]
   );
 
   const getTrackById = useCallback(
-    async (token: string, trackId: string): Promise<any | null> => {
+    async (token: string, trackId: string): Promise<TrackObject | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -137,7 +209,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       setError(null);
       try {
         const data = await fetchWebApi(token, `tracks/${trackId}`);
-        return data;
+        return normalizeTrackObject(data);
       } catch (err: any) {
         setError(err.message || "Failed to fetch track");
         return null;
@@ -145,7 +217,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, normalizeTrackObject]
   );
 
   // 관련 아티스트 가져오기
@@ -180,7 +252,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       token: string,
       artistId: string,
       market: string = "KR"
-    ): Promise<any[] | null> => {
+    ): Promise<TrackObject[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -193,7 +265,8 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
           token,
           `artists/${artistId}/top-tracks?market=${market}`
         );
-        return data.tracks ?? null;
+        const tracks = data.tracks || [];
+        return tracks.map(normalizeTrackObject);
       } catch (err: any) {
         setError(err.message || "Failed to fetch artist top tracks");
         return null;
@@ -201,7 +274,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, normalizeTrackObject]
   );
 
   // 장르별 검색
@@ -210,7 +283,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       token: string,
       genre: string,
       limit: number = 20
-    ): Promise<any[] | null> => {
+    ): Promise<TrackObject[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -225,7 +298,8 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
             genre
           )}&type=track&market=KR&limit=${limit}`
         );
-        return data.tracks?.items ?? null;
+        const tracks = data.tracks?.items || [];
+        return tracks.map(normalizeTrackObject);
       } catch (err: any) {
         setError(err.message || "Failed to search by genre");
         return null;
@@ -233,7 +307,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, normalizeTrackObject]
   );
 
   // 트랙 기반 유사한 트랙 검색 (audio features 활용)
@@ -242,7 +316,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       token: string,
       trackId: string,
       limit: number = 20
-    ): Promise<any[] | null> => {
+    ): Promise<TrackObject[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -275,9 +349,9 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         const similarTracks =
           searchData.tracks?.items?.filter(
             (track: any) => track.id !== trackId
-          ) ?? null;
+          ) || [];
 
-        return similarTracks;
+        return similarTracks.map(normalizeTrackObject);
       } catch (err: any) {
         setError(err.message || "Failed to find similar tracks");
         return null;
@@ -285,7 +359,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, normalizeTrackObject]
   );
 
   // 기존 getRecommendations 함수를 대체 방법으로 구현
@@ -293,7 +367,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
     async (
       token: string,
       options: Record<string, any>
-    ): Promise<any[] | null> => {
+    ): Promise<TrackObject[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -410,7 +484,9 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
                   )}&type=track&market=KR&limit=20`
                 );
                 if (searchData.tracks?.items) {
-                  recommendations.push(...searchData.tracks.items.slice(0, 10));
+                  const searchTracks =
+                    searchData.tracks.items.map(normalizeTrackObject);
+                  recommendations.push(...searchTracks.slice(0, 10));
                 }
               }
             } catch (err) {
@@ -422,14 +498,15 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         // 제외할 아티스트 ID 목록에서 중복 제거
         excludedArtistIds = [...new Set(excludedArtistIds)];
 
-        // 같은 아티스트 트랙 필터링 및 중복 제거
+        // 같은 아티스트 트랙 필터링 및 중복 제거 - TrackObject 타입으로 처리
         const filteredRecommendations = recommendations.filter(
-          (track, index, self) => {
+          (track: TrackObject, index: number, self: TrackObject[]) => {
             // 중복 트랙 제거
-            const isUnique = index === self.findIndex((t) => t.id === track.id);
+            const isUnique =
+              index === self.findIndex((t) => t.trackId === track.trackId);
 
             // 제외할 아티스트 확인
-            const hasExcludedArtist = track.artists?.some((artist: any) =>
+            const hasExcludedArtist = track.artists?.some((artist) =>
               excludedArtistIds.includes(artist.id)
             );
 
@@ -442,15 +519,17 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
           try {
             const popularTracks = await searchByGenre(token, "pop", 50);
             if (popularTracks) {
-              const additionalTracks = popularTracks.filter((track) => {
-                const hasExcludedArtist = track.artists?.some((artist: any) =>
-                  excludedArtistIds.includes(artist.id)
-                );
-                const alreadyIncluded = filteredRecommendations.some(
-                  (rec) => rec.id === track.id
-                );
-                return !hasExcludedArtist && !alreadyIncluded;
-              });
+              const additionalTracks = popularTracks.filter(
+                (track: TrackObject) => {
+                  const hasExcludedArtist = track.artists?.some((artist) =>
+                    excludedArtistIds.includes(artist.id)
+                  );
+                  const alreadyIncluded = filteredRecommendations.some(
+                    (rec: TrackObject) => rec.trackId === track.trackId
+                  );
+                  return !hasExcludedArtist && !alreadyIncluded;
+                }
+              );
 
               filteredRecommendations.push(...additionalTracks);
             }
@@ -465,7 +544,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         );
         const limit = options.limit || 20;
 
-        return shuffled.slice(0, limit);
+        return shuffled.slice(0, limit) as TrackObject[];
       } catch (err: any) {
         setError(err.message || "Failed to fetch recommendations");
         return null;
@@ -473,7 +552,13 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi, getArtistTopTracks, searchByGenre, getRelatedArtists]
+    [
+      fetchWebApi,
+      getArtistTopTracks,
+      searchByGenre,
+      getRelatedArtists,
+      normalizeTrackObject,
+    ]
   );
 
   return (

@@ -67,7 +67,7 @@ export interface TrackObject {
     spotify: string;
   };
   href: string;
-  id: string;
+  trackId: string;
   is_playable: boolean;
   linked_from?: {
     external_urls: {
