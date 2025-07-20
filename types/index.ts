@@ -90,6 +90,10 @@ export interface TrackObject {
   is_local: boolean;
 }
 
+export interface TrackGroup {
+  options: string[];
+  answer: string;
+}
 
 // Global augmentation for Spotify Web Playback SDK
 declare global {

@@ -10,7 +10,7 @@ import React, {
 import { useRouter } from "next/navigation";
 import { generateCodeVerifier, generateCodeChallenge } from "@/lib/spotify";
 import { UserProfile } from "@/types";
-import { useMutation } from "convex/react";
+import { useConvexAuth, useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 interface SpotifyAuthContextType {
@@ -29,33 +29,11 @@ export const SpotifyAuthProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
+  const { isAuthenticated, isLoading } = useConvexAuth();
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
-
-  const getToken = async (code: string, verifier: string) => {
-    const body = new URLSearchParams({
-      client_id: process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID!,
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: process.env.NEXT_PUBLIC_REDIRECT_URI!,
-      code_verifier: verifier,
-    });
-
-    const res = await fetch("https://accounts.spotify.com/api/token", {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    });
-
-    const data = await res.json();
-    if (!res.ok)
-      throw new Error(data.error_description || "Failed to get token");
-
-    localStorage.setItem("access_token", data.access_token);
-    return data.access_token;
-  };
 
   const fetchProfile = async (accessToken: string) => {
     const res = await fetch("https://api.spotify.com/v1/me", {
@@ -74,6 +52,9 @@ export const SpotifyAuthProvider = ({
 
   const handleCallback = useCallback(
     async (params: URLSearchParams) => {
+      // Wait for Convex authentication to complete before processing callback
+      if (isLoading) return;
+
       setLoading(true);
       try {
         const code = params.get("code");
@@ -102,12 +83,14 @@ export const SpotifyAuthProvider = ({
         // Save tokens in localStorage as before
         localStorage.setItem("access_token", data.access_token);
 
-        // Also update tokens in Convex backend database
-        await updateSpotifyToken({
-          accessToken: data.access_token,
-          refreshToken: data.refresh_token,
-          expiresIn: data.expires_in,
-        });
+        // Only update tokens in Convex if user is authenticated
+        if (isAuthenticated) {
+          await updateSpotifyToken({
+            accessToken: data.access_token,
+            refreshToken: data.refresh_token,
+            expiresIn: data.expires_in,
+          });
+        }
 
         // Fetch and set profile
         await fetchProfile(data.access_token);
@@ -121,7 +104,7 @@ export const SpotifyAuthProvider = ({
         setLoading(false);
       }
     },
-    [updateSpotifyToken, router]
+    [updateSpotifyToken, router, isLoading, isAuthenticated]
   );
 
   const login = async () => {
@@ -159,6 +142,14 @@ export const SpotifyAuthProvider = ({
   };
 
   useEffect(() => {
+    // Wait for Convex authentication to complete before checking Spotify tokens
+    if (isLoading) {
+      // While Convex is loading, show loading state
+      setLoading(true);
+      return;
+    }
+
+    // Once Convex loading is complete, check for Spotify token
     const token = localStorage.getItem("access_token");
     if (!token) {
       setLoading(false);
@@ -172,11 +163,21 @@ export const SpotifyAuthProvider = ({
         localStorage.removeItem("access_token");
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [isLoading]); // Add isLoading as dependency
+
+  // Show loading while either Convex or Spotify auth is loading
+  const combinedLoading = isLoading || loading;
 
   return (
     <SpotifyAuthContext.Provider
-      value={{ isSignedIn, profile, loading, login, logout, handleCallback }}
+      value={{
+        isSignedIn,
+        profile,
+        loading: combinedLoading,
+        login,
+        logout,
+        handleCallback,
+      }}
     >
       {children}
     </SpotifyAuthContext.Provider>

@@ -13,36 +13,27 @@ import React, {
 
 interface SpotifyApiContextType {
   getTopTracks: (
-    token: string,
     num: number,
     time_range?: "short_term" | "medium_term" | "long_term"
   ) => Promise<any[] | null>;
-  getTrackById: (token: string, trackId: string) => Promise<any | null>;
+  getTrackById: (trackId: string) => Promise<any | null>;
 
   // 새로운 추천 함수들
-  getRecommendations: (
-    token: string,
-    options: Record<string, any>
-  ) => Promise<any[] | null>;
-  getRelatedArtists: (token: string, artistId: string) => Promise<any[] | null>;
+  getRecommendations: (options: Record<string, any>) => Promise<any[] | null>;
+  getRelatedArtists: (artistId: string) => Promise<any[] | null>;
   getArtistTopTracks: (
-    token: string,
     artistId: string,
     market?: string
   ) => Promise<any[] | null>;
-  searchByGenre: (
-    token: string,
-    genre: string,
-    limit?: number
-  ) => Promise<any[] | null>;
+  searchByGenre: (genre: string, limit?: number) => Promise<any[] | null>;
   searchSimilarTracks: (
-    token: string,
     trackId: string,
     limit?: number
   ) => Promise<any[] | null>;
 
   loading: boolean;
   error: string | null;
+  hasToken: boolean;
 }
 
 const SpotifyApiContext = createContext<SpotifyApiContextType | undefined>(
@@ -52,16 +43,24 @@ const SpotifyApiContext = createContext<SpotifyApiContextType | undefined>(
 export function SpotifyApiProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+
+  // You'll need to implement token management here
+  // This could come from your Convex queries or local storage
+  const tokenQuery = useQuery(api.users.getAccessToken); // Adjust this based on your Convex setup
+  const refreshTokenMutation = useMutation(api.users.refreshAccessToken);
+
+  useEffect(() => {
+    if (tokenQuery) {
+      setToken(tokenQuery);
+    }
+  }, [tokenQuery]);
+
+  const hasToken = Boolean(token);
 
   // Helper to call Spotify Web API with automatic token refresh
   const fetchWebApi = useCallback(
-    async (
-      token: string,
-      endpoint: string,
-      method = "GET",
-      body?: any,
-      retryCount = 0
-    ) => {
+    async (endpoint: string, method = "GET", body?: any, retryCount = 0) => {
       if (!token) throw new Error("No access token");
 
       const res = await fetch(`https://api.spotify.com/v1/${endpoint}`, {
@@ -79,8 +78,8 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         // Handle token expiration with automatic refresh (retry once)
         if (res.status === 401 && retryCount === 0) {
           try {
-            // const newToken = await refreshTokenMutation();
-            // setToken(newToken);
+            const newToken = await refreshTokenMutation();
+            setToken(newToken);
 
             // Retry the request with the new token
             return await fetchWebApi(endpoint, method, body, 1);
@@ -94,12 +93,11 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
 
       return await res.json();
     },
-    []
+    [token, refreshTokenMutation]
   );
 
   const getTopTracks = useCallback(
     async (
-      token: string,
       num: number,
       time_range: "short_term" | "medium_term" | "long_term" = "short_term"
     ): Promise<any[] | null> => {
@@ -112,7 +110,6 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       setError(null);
       try {
         const data = await fetchWebApi(
-          token,
           `me/top/tracks?limit=${num}&time_range=${time_range}`
         );
         return data.items ?? null;
@@ -123,11 +120,11 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, token]
   );
 
   const getTrackById = useCallback(
-    async (token: string, trackId: string): Promise<any | null> => {
+    async (trackId: string): Promise<any | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -136,7 +133,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchWebApi(token, `tracks/${trackId}`);
+        const data = await fetchWebApi(`tracks/${trackId}`);
         return data;
       } catch (err: any) {
         setError(err.message || "Failed to fetch track");
@@ -145,12 +142,12 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, token]
   );
 
   // 관련 아티스트 가져오기
   const getRelatedArtists = useCallback(
-    async (token: string, artistId: string): Promise<any[] | null> => {
+    async (artistId: string): Promise<any[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -159,10 +156,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       setError(null);
       try {
-        const data = await fetchWebApi(
-          token,
-          `artists/${artistId}/related-artists`
-        );
+        const data = await fetchWebApi(`artists/${artistId}/related-artists`);
         return data.artists ?? null;
       } catch (err: any) {
         setError(err.message || "Failed to fetch related artists");
@@ -171,16 +165,12 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, token]
   );
 
   // 아티스트의 인기 트랙 가져오기
   const getArtistTopTracks = useCallback(
-    async (
-      token: string,
-      artistId: string,
-      market: string = "KR"
-    ): Promise<any[] | null> => {
+    async (artistId: string, market: string = "KR"): Promise<any[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -190,7 +180,6 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       setError(null);
       try {
         const data = await fetchWebApi(
-          token,
           `artists/${artistId}/top-tracks?market=${market}`
         );
         return data.tracks ?? null;
@@ -201,16 +190,12 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, token]
   );
 
   // 장르별 검색
   const searchByGenre = useCallback(
-    async (
-      token: string,
-      genre: string,
-      limit: number = 20
-    ): Promise<any[] | null> => {
+    async (genre: string, limit: number = 20): Promise<any[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -220,7 +205,6 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       setError(null);
       try {
         const data = await fetchWebApi(
-          token,
           `search?q=genre:${encodeURIComponent(
             genre
           )}&type=track&market=KR&limit=${limit}`
@@ -233,16 +217,12 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, token]
   );
 
   // 트랙 기반 유사한 트랙 검색 (audio features 활용)
   const searchSimilarTracks = useCallback(
-    async (
-      token: string,
-      trackId: string,
-      limit: number = 20
-    ): Promise<any[] | null> => {
+    async (trackId: string, limit: number = 20): Promise<any[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -253,8 +233,8 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
       try {
         // 먼저 트랙 정보와 audio features를 가져옴
         const [trackData, audioFeatures] = await Promise.all([
-          fetchWebApi(token, `tracks/${trackId}`),
-          fetchWebApi(token, `audio-features/${trackId}`),
+          fetchWebApi(`tracks/${trackId}`),
+          fetchWebApi(`audio-features/${trackId}`),
         ]);
 
         // 아티스트의 장르 정보로 검색
@@ -265,7 +245,6 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
             : `artist:${trackData.artists[0]?.name}`;
 
         const searchData = await fetchWebApi(
-          token,
           `search?q=${encodeURIComponent(
             searchQuery
           )}&type=track&market=KR&limit=${limit}`
@@ -285,15 +264,12 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi]
+    [fetchWebApi, token]
   );
 
   // 기존 getRecommendations 함수를 대체 방법으로 구현
   const getRecommendations = useCallback(
-    async (
-      token: string,
-      options: Record<string, any>
-    ): Promise<any[] | null> => {
+    async (options: Record<string, any>): Promise<any[] | null> => {
       if (!token) {
         setError("No access token. Please log in first.");
         return null;
@@ -314,7 +290,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
           // 원본 트랙들의 아티스트 ID 수집
           for (const trackId of trackIds) {
             try {
-              const trackData = await fetchWebApi(token, `tracks/${trackId}`);
+              const trackData = await fetchWebApi(`tracks/${trackId}`);
               const artistIds =
                 trackData.artists?.map((artist: any) => artist.id) || [];
               excludedArtistIds.push(...artistIds);
@@ -337,7 +313,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
             // 최대 2개만 처리
             try {
               // 관련 아티스트 가져오기
-              const relatedArtists = await getRelatedArtists(token, artistId);
+              const relatedArtists = await getRelatedArtists(artistId);
               if (relatedArtists && relatedArtists.length > 0) {
                 // 관련 아티스트 중 랜덤하게 2-3명 선택
                 const selectedArtists = relatedArtists
@@ -345,10 +321,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
                   .slice(0, 3);
 
                 for (const relatedArtist of selectedArtists) {
-                  const topTracks = await getArtistTopTracks(
-                    token,
-                    relatedArtist.id
-                  );
+                  const topTracks = await getArtistTopTracks(relatedArtist.id);
                   if (topTracks) {
                     recommendations.push(...topTracks.slice(0, 3));
                   }
@@ -371,7 +344,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
 
           for (const genre of genres.slice(0, 2)) {
             // 최대 2개만 처리
-            const genreTracks = await searchByGenre(token, genre, 20); // 더 많이 가져와서 필터링
+            const genreTracks = await searchByGenre(genre, 20); // 더 많이 가져와서 필터링
             if (genreTracks) {
               recommendations.push(...genreTracks.slice(0, 10));
             }
@@ -388,23 +361,18 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
             // 최대 2개만 처리
             try {
               // 트랙 정보 가져오기
-              const trackData = await fetchWebApi(token, `tracks/${trackId}`);
+              const trackData = await fetchWebApi(`tracks/${trackId}`);
               const artistGenres = trackData.artists[0]?.genres || [];
 
               // 장르 기반 검색 (원본 아티스트 제외)
               if (artistGenres.length > 0) {
-                const genreTracks = await searchByGenre(
-                  token,
-                  artistGenres[0],
-                  20
-                );
+                const genreTracks = await searchByGenre(artistGenres[0], 20);
                 if (genreTracks) {
                   recommendations.push(...genreTracks.slice(0, 10));
                 }
               } else {
                 // 장르 정보가 없으면 아티스트 이름으로 검색
                 const searchData = await fetchWebApi(
-                  token,
                   `search?q=artist:${encodeURIComponent(
                     trackData.artists[0]?.name
                   )}&type=track&market=KR&limit=20`
@@ -440,7 +408,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         // 추천 트랙이 부족한 경우 일반 인기 트랙으로 보충
         if (filteredRecommendations.length < (options.limit || 20)) {
           try {
-            const popularTracks = await searchByGenre(token, "pop", 50);
+            const popularTracks = await searchByGenre("pop", 50);
             if (popularTracks) {
               const additionalTracks = popularTracks.filter((track) => {
                 const hasExcludedArtist = track.artists?.some((artist: any) =>
@@ -473,7 +441,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         setLoading(false);
       }
     },
-    [fetchWebApi, getArtistTopTracks, searchByGenre, getRelatedArtists]
+    [fetchWebApi, token, getArtistTopTracks, searchByGenre, getRelatedArtists]
   );
 
   return (
@@ -488,6 +456,7 @@ export function SpotifyApiProvider({ children }: { children: ReactNode }) {
         getTrackById,
         loading,
         error,
+        hasToken,
       }}
     >
       {children}

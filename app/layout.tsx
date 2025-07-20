@@ -34,7 +34,7 @@ export default function RootLayout({
         <ConvexClientProvider>
           <SpotifyAuthProvider>
             <SpotifyApiProvider>
-              <Toaster position="bottom-center" />
+              <Toaster position="bottom-right" />
               {children}
             </SpotifyApiProvider>
           </SpotifyAuthProvider>

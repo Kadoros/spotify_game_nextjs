@@ -1,58 +1,54 @@
+import { customAlphabet } from "nanoid";
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
 
+// Mutation to record a game result
 export const recordGameResult = mutation({
   args: {
     gameId: v.id("games"),
-    playerId: v.optional(v.string()), // null for anonymous
+    playerId: v.optional(v.string()), // optional for anonymous users
     endRound: v.number(),
     livesLeft: v.number(),
     isFinished: v.boolean(),
   },
   handler: async (ctx, args) => {
-    // Player can be anonymous, so auth check is optional
-    // But it can be enforced auth if you want:
-    // const identity = await ctx.auth.getUserIdentity();
-    // if (!identity) throw new Error("Not authenticated");
-
     const game = await ctx.db.get(args.gameId);
     if (!game) {
       throw new Error("Game not found");
     }
 
-    // Save the same link for sharing results
-    const link = game.link;
-
-    const result = await ctx.db.insert("gameResults", {
+    const resultId = await ctx.db.insert("gameResults", {
       gameId: args.gameId,
       playerId: args.playerId,
       endRound: args.endRound,
       livesLeft: args.livesLeft,
       isFinished: args.isFinished,
       createdAt: Date.now(),
-      link,
     });
 
-    return result;
+    return resultId;
   },
 });
 
-export const getResultsByLink = query({
-  args: { link: v.string() },
+// Query to get all results for a specific game
+export const getResultsByGameId = query({
+  args: { gameId: v.id("games") },
   handler: async (ctx, args) => {
     const results = await ctx.db
       .query("gameResults")
-      .withIndex("by_link", (q) => q.eq("link", args.link))
+      .withIndex("by_game", (q) => q.eq("gameId", args.gameId))
       .collect();
 
     return results;
   },
 });
 
+// Query to get all results for the current player
 export const getResultsByPlayer = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+
     const playerId = identity.subject;
 
     const results = await ctx.db

@@ -1,10 +1,7 @@
 import { mutation, query } from "./_generated/server";
 import { v } from "convex/values";
-import { customAlphabet } from "nanoid";
 
-// nanoid for generating short unique links
-const nanoid = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 8);
-
+// Create a new game
 export const createGame = mutation({
   args: {
     trackGroups: v.array(
@@ -24,37 +21,31 @@ export const createGame = mutation({
       throw new Error("trackGroups cannot be empty");
     }
 
-    const link = nanoid();
-
-    const game = await ctx.db.insert("games", {
+    const gameId = await ctx.db.insert("games", {
       ownerId,
       trackGroups: args.trackGroups,
       rounds: args.trackGroups.length,
       lives: args.lives,
       createdAt: Date.now(),
-      link,
     });
 
-    return game;
+    return gameId;
   },
 });
 
-export const getGameByLink = query({
-  args: { link: v.string() },
+// Get a game by its ID
+export const getGameById = query({
+  args: { gameId: v.id("games") },
   handler: async (ctx, args) => {
-    const game = await ctx.db
-      .query("games")
-      .withIndex("by_link", (q) => q.eq("link", args.link))
-      .unique();
-
+    const game = await ctx.db.get(args.gameId);
     if (!game) {
       throw new Error("Game not found");
     }
-
     return game;
   },
 });
 
+// Get games created by the current user
 export const getGamesByOwner = query({
   handler: async (ctx) => {
     const identity = await ctx.auth.getUserIdentity();

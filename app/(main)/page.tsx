@@ -11,12 +11,6 @@ import { api } from "@/convex/_generated/api";
 
 export default function Home() {
   const router = useRouter();
-  const { isSignedIn, login } = useSpotifyAuth();
-
-  const [term, setTerm] = useState<"short_term" | "medium_term" | "long_term">(
-    "short_term"
-  );
-  const [rounds, setRounds] = useState<number>(5);
 
   const { user } = useUser();
   const createUser = useMutation(api.users.createUser);
@@ -32,7 +26,7 @@ export default function Home() {
 
   const handleStart = () => {
     // Example: pass term and rounds as query params if you want
-    router.push(`/game?term=${term}&rounds=${rounds}`);
+    router.push(`/create-game`);
   };
 
   return (
@@ -43,24 +37,12 @@ export default function Home() {
         tracks. Can your friends guess which one is the real repeat?
       </p>
 
-      {isSignedIn && (
-        <TermAndRoundSelector
-          term={term}
-          rounds={rounds}
-          onTermChange={setTerm}
-          onRoundsChange={setRounds}
-        />
-      )}
-
-      {!isSignedIn ? (
-        <Button onClick={login} className="text-lg px-6 py-3">
-          Sign in to Start 🎵
-        </Button>
-      ) : (
-        <Button onClick={handleStart} className="text-lg px-6 py-3">
-          Play Game 🎮
-        </Button>
-      )}
+      <Button
+        onClick={handleStart}
+        className="bg-black/40 border-white/20 hover:bg-gray-700 px-4 text-lg"
+      >
+        Create Game
+      </Button>
 
       <div className="mt-12 text-sm text-gray-500">
         Built with Spotify API, Clerk Auth, and Next.js 💿
