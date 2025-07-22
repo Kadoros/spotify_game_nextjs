@@ -17,6 +17,11 @@ export default function MainGame({ gameId }: MainGameProps) {
     gameId: gameId as Id<"games">,
   });
 
+  const owner = useQuery(
+    api.users.getUserById,
+    gameData?.ownerId ? { userId: gameData.ownerId } : "skip"
+  );
+
   const [currentRound, setCurrentRound] = useState(0);
   const [lives, setLives] = useState(5);
   const [wrongCount, setWrongCount] = useState(0);
@@ -26,13 +31,24 @@ export default function MainGame({ gameId }: MainGameProps) {
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
 
   const currentTrackGroup = gameData?.trackGroups?.[currentRound];
-  const roundTracks = useQuery(api.tracks.getTracksByIds, {
-    trackIds: (currentTrackGroup?.options || []) as Id<"tracks">[],
-  });
+
+  const roundTracks = useQuery(
+    api.tracks.getTracksByIds,
+    currentTrackGroup
+      ? {
+          trackIds: currentTrackGroup.options as Id<"tracks">[],
+        }
+      : "skip"
+  );
 
   function handleSelect(trackId: string) {
-    if (selectedTrackId && isCorrect !== null) return;
-    if (!currentTrackGroup || !gameData) return;
+    if (
+      selectedTrackId ||
+      isCorrect !== null ||
+      !currentTrackGroup ||
+      !gameData
+    )
+      return;
 
     setSelectedTrackId(trackId);
 
@@ -41,23 +57,24 @@ export default function MainGame({ gameId }: MainGameProps) {
 
     if (correct) {
       setScore((s) => s + 1);
-
       setTimeout(() => {
         if (currentRound + 1 >= gameData.trackGroups.length) {
           setGameOver(true);
         } else {
           setCurrentRound((r) => r + 1);
         }
-
         setSelectedTrackId(null);
         setIsCorrect(null);
         setWrongCount(0);
       }, 1500);
     } else {
-      setLives((l) => l - 1);
-      setWrongCount((w) => w + 1);
+      const newWrongCount = wrongCount + 1;
+      const newLives = lives - 1;
 
-      if (lives - 1 <= 0 || wrongCount + 1 >= 2) {
+      setWrongCount(newWrongCount);
+      setLives(newLives);
+
+      if (newLives <= 0 || newWrongCount >= 2) {
         setTimeout(() => setGameOver(true), 1500);
       } else {
         setTimeout(() => {
@@ -72,7 +89,7 @@ export default function MainGame({ gameId }: MainGameProps) {
     return (
       <div className="flex items-center justify-center p-8 h-64">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
           <p className="text-lg">Loading game data...</p>
         </div>
       </div>
@@ -104,28 +121,25 @@ export default function MainGame({ gameId }: MainGameProps) {
   if (gameOver) {
     return (
       <GameScoreBoard
+        gameId={gameId}
         round={currentRound + 1}
         totalRounds={gameData.trackGroups.length}
         lives={lives}
         score={score}
+        ownerId={gameData.ownerId as Id<"users">} // Cast if needed
       />
     );
   }
 
-  const totalRounds = gameData.trackGroups.length;
-
   return (
     <div className="flex flex-col p-4 max-w-4xl mx-auto h-full">
       <div className="mb-4 flex justify-between text-lg font-semibold">
-        <div>
-          Round: {currentRound + 1} / {totalRounds}
-        </div>
-        <div>Lives: {lives}</div>
-        <div>Score: {score}</div>
+        <div>Top: {currentRound + 1}</div>
+        <div>❤️ : {lives}</div>
       </div>
       <div className="h-full">
         <SpotifyGrid
-          tracks={roundTracks as TrackObject[]} // Cast if needed
+          tracks={roundTracks as TrackObject[]}
           selectedTrackId={selectedTrackId}
           isCorrect={isCorrect}
           onSelect={handleSelect}

@@ -30,13 +30,58 @@ export default function CreateGamePage() {
     () => userData?.spotifyRefreshToken ?? null,
     [userData]
   );
+  const expriedAt = useMemo(
+    () => userData?.spotifyExpiresAt ?? null,
+    [userData]
+  );
+
+  const updateToken = useMutation(api.users.updateSpotifyToken);
 
   useEffect(() => {
     if (isLoading || userData === undefined) return;
+
+    const refreshAccessToken = async () => {
+      try {
+        const res = await fetch("/api/refresh-token", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        });
+
+        const data = await res.json();
+
+        console.log(data);
+
+        if (!data.access_token) throw new Error("No access token returned");
+
+        await updateToken({
+          accessToken: data.access_token,
+          refreshToken: data.refresh_token ?? refreshToken,
+          expiresIn: data.expires_in,
+        });
+
+        router.refresh(); // 상태 반영
+      } catch (err) {
+        console.error("Failed to refresh token", err);
+        toast.error("Spotify 인증이 만료되었습니다.");
+        router.replace("/connect-spotify");
+      }
+    };
+
     if (!accessToken || !refreshToken) {
       router.replace("/connect-spotify");
+    } else if (expriedAt && expriedAt < Date.now()) {
+      refreshAccessToken();
     }
-  }, [isLoading, userData, accessToken, refreshToken, router]);
+  }, [
+    isLoading,
+    userData,
+    accessToken,
+    refreshToken,
+    expriedAt,
+    updateToken,
+    router,
+  ]);
 
   const [lives, setLives] = useState(3);
   const [rounds, setRounds] = useState(5);

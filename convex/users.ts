@@ -1,89 +1,25 @@
 import { query, mutation } from "./_generated/server";
 import { v } from "convex/values";
 
-export const getAccessToken = query({
-  handler: async (ctx) => {
-    
-    // const identity = await ctx.auth.getUserIdentity();
-    // if (!identity) throw new Error("Not authenticated");
-
-    // const userId = identity.subject;
-
-    // const user = await ctx.db
-    //   .query("users")
-    //   .withIndex("by_userId", (q) => q.eq("userId", userId))
-    //   .unique();
-    //   if (!user || !user.spotifyAccessToken || !user.spotifyExpiresAt) {
-    //     return null; // no token info
-    //     console.log("getAccessToken")
-    // }
-
-    // const now = Date.now();
-
-    // if (user.spotifyExpiresAt > now) {
-    //   return user.spotifyAccessToken; // valid token
-    // }
-
-    return null; // expired token
+export const getUserById = query({
+  args: {
+    userId: v.string(),
   },
-});
-
-export const refreshAccessToken = mutation({
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
-
-    const userId = identity.subject;
-
+  handler: async (ctx, args) => {
     const user = await ctx.db
       .query("users")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .unique();
 
-    if (!user || !user.spotifyAccessToken || !user.spotifyRefreshToken) {
-      throw new Error("Spotify tokens not found");
-    }
+    if (!user) throw new Error("User not found");
 
-    const now = Date.now();
-
-    if (user.spotifyExpiresAt && user.spotifyExpiresAt > now) {
-      return user.spotifyAccessToken;
-    }
-
-    const refreshed = await refreshSpotifyToken(user.spotifyRefreshToken);
-    if (!refreshed) throw new Error("Failed to refresh token");
-
-    await ctx.db.patch(user._id, {
-      spotifyAccessToken: refreshed.access_token,
-      spotifyRefreshToken: refreshed.refresh_token ?? user.spotifyRefreshToken,
-      spotifyExpiresAt: Date.now() + refreshed.expires_in * 1000,
-    });
-
-    return refreshed.access_token;
+    return user;
   },
 });
 
-async function refreshSpotifyToken(refreshToken: string) {
-  const clientId = process.env.SPOTIFY_CLIENT_ID!;
-  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET!;
-  const authHeader = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
 
-  const res = await fetch("https://accounts.spotify.com/api/token", {
-    method: "POST",
-    headers: {
-      Authorization: `Basic ${authHeader}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    }),
-  });
 
-  if (!res.ok) return null;
 
-  return await res.json();
-}
 
 
 
