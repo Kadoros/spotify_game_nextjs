@@ -17,6 +17,7 @@ export default function CreateGamePage() {
   const { isLoading } = useConvexAuth();
 
   const [gameId, setGameId] = useState<string>("");
+  const [isCreating, setIsCreating] = useState(false); // <-- loading state
 
   const userData = useQuery(api.users.getUser);
   const createGame = useMutation(api.games.createGame);
@@ -94,6 +95,8 @@ export default function CreateGamePage() {
   const handleMake = useCallback(async (): Promise<void> => {
     if (isLoading || userData === undefined || !accessToken) return;
 
+    setIsCreating(true); // start loading
+
     const termMap: Record<
       "short" | "middle" | "long",
       "short_term" | "medium_term" | "long_term"
@@ -166,6 +169,8 @@ export default function CreateGamePage() {
     } catch (err: any) {
       console.error("Failed to create game:", err);
       toast.error(err.message || "Error creating game. Try again.");
+    } finally {
+      setIsCreating(false); // stop loading
     }
   }, [
     rounds,
@@ -198,7 +203,7 @@ export default function CreateGamePage() {
 
   const handlePreviewGame = useCallback(() => {
     if (!gameId) return;
-    router.push(`/game/${gameId}`);
+    router.push(`/game/preview/${gameId}`);
   }, [gameId, router]);
 
   if (isLoading || userData === undefined) {
@@ -239,12 +244,12 @@ export default function CreateGamePage() {
 
           <div className="space-y-2">
             <Label>Time Range</Label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
               {["short", "middle", "long"].map((term) => (
                 <Button
                   key={term}
                   onClick={() => setActiveTerm(term as any)}
-                  className={`capitalize px-4 py-2 rounded-md text-white transition border ${
+                  className={`capitalize px-4 py-2 rounded-md text-white transition border min-w-0 ${
                     activeTerm === term
                       ? "bg-black/40 border-white/40 ring-2 ring-white/40"
                       : "bg-black/40 border-white/10 hover:bg-gray-700"
@@ -257,11 +262,35 @@ export default function CreateGamePage() {
           </div>
 
           <Button
-            className="w-full hover:bg-gray-700"
+            className="w-full hover:bg-gray-700 flex justify-center items-center"
             onClick={handleMake}
-            disabled={isLoading || userData === undefined || !accessToken}
+            disabled={
+              isLoading || userData === undefined || !accessToken || isCreating
+            }
           >
-            Create Game
+            {isCreating && (
+              <svg
+                className="animate-spin h-5 w-5 mr-2 text-white"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                ></circle>
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                ></path>
+              </svg>
+            )}
+            {isCreating ? "Creating..." : "Create Game"}
           </Button>
         </>
       ) : (
@@ -278,7 +307,11 @@ export default function CreateGamePage() {
           <div className="flex gap-2">
             <Input
               readOnly
-              value={`${typeof window !== "undefined" ? window.location.protocol + "//" + window.location.host : ""}/game/${gameId}`}
+              value={`${
+                typeof window !== "undefined"
+                  ? window.location.protocol + "//" + window.location.host
+                  : ""
+              }/game/${gameId}`}
               className="bg-black/40 border-white/20 text-white"
             />
             <Button
