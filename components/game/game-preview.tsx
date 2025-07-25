@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import SpotifyGrid from "./spotify-grid";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
