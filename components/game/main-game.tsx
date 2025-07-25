@@ -30,6 +30,9 @@ export default function MainGame({ gameId }: MainGameProps) {
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
 
+  // New state to track all user selections
+  const [userSelections, setUserSelections] = useState<string[]>([]);
+
   const currentTrackGroup = gameData?.trackGroups?.[currentRound];
 
   const roundTracks = useQuery(
@@ -51,6 +54,9 @@ export default function MainGame({ gameId }: MainGameProps) {
       return;
 
     setSelectedTrackId(trackId);
+
+    // Record the user's selection
+    setUserSelections((prev) => [...prev, trackId]);
 
     const correct = trackId === currentTrackGroup.answer;
     setIsCorrect(correct);
@@ -119,6 +125,7 @@ export default function MainGame({ gameId }: MainGameProps) {
   }
 
   if (gameOver) {
+    // Pass userSelections to GameScoreBoard if needed
     return (
       <GameScoreBoard
         gameId={gameId}
@@ -126,7 +133,8 @@ export default function MainGame({ gameId }: MainGameProps) {
         totalRounds={gameData.trackGroups.length}
         lives={lives}
         score={score}
-        ownerId={gameData.ownerId as Id<"users">} // Cast if needed
+        ownerId={gameData.ownerId as Id<"users">}
+        userSelections={userSelections || []} // Ensure it's always an array
       />
     );
   }
@@ -137,6 +145,14 @@ export default function MainGame({ gameId }: MainGameProps) {
         <div>Top: {currentRound + 1}</div>
         <div>❤️ : {lives}</div>
       </div>
+
+      {/* Optional: Display current selections for debugging */}
+      {process.env.NODE_ENV === "development" && (
+        <div className="mb-2 text-sm text-gray-500">
+          Selections: {userSelections.length} recorded
+        </div>
+      )}
+
       <div className="h-full">
         <SpotifyGrid
           tracks={roundTracks as TrackObject[]}

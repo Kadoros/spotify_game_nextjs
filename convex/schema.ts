@@ -34,6 +34,7 @@ export default defineSchema({
     endRound: v.number(),             // how far the player got
     livesLeft: v.number(),            // lives remaining at end
     isFinished: v.boolean(),          // should be true when recorded
+    userSelections: v.array(v.string()),
     createdAt: v.number(),
   })
   .index("by_game", ["gameId"])

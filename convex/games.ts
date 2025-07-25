@@ -34,16 +34,18 @@ export const createGame = mutation({
 });
 
 // Get a game by its ID
+
 export const getGameById = query({
   args: { gameId: v.id("games") },
   handler: async (ctx, args) => {
-    const game = await ctx.db.get(args.gameId);
-    if (!game) {
-      throw new Error("Game not found");
-    }
+    const game = await ctx.db
+      .query("games")
+      .withIndex("by_id", (q) => q.eq("_id", args.gameId))
+      .unique();
     return game;
   },
 });
+
 
 // Get games created by the current user
 export const getGamesByOwner = query({

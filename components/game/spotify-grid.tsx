@@ -9,6 +9,8 @@ interface SpotifyGridProps {
   selectedTrackId: string | null;
   isCorrect: boolean | null;
   onSelect: (trackId: string) => void;
+  highlightTrackIds?: string[]; // New: for result viewing
+  correctTrackId?: string; // New: to mark correct answer
 }
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -25,6 +27,8 @@ export default function SpotifyGrid({
   selectedTrackId,
   isCorrect,
   onSelect,
+  highlightTrackIds,
+  correctTrackId,
 }: SpotifyGridProps) {
   const [shuffledTracks, setShuffledTracks] = useState<TrackObject[]>([]);
 
@@ -35,17 +39,26 @@ export default function SpotifyGrid({
   return (
     <div className="p-4 max-w-xl mx-auto">
       <div className="grid grid-cols-2 gap-4">
-        {shuffledTracks.map((track, idx) => (
-          <SpotifyCard
-            key={track.trackId}
-            track={track}
-            label={String.fromCharCode(65 + idx)} // A, B, C, D
-            onClick={() => onSelect(track.trackId)}
-            isSelected={selectedTrackId === track.trackId}
-            isCorrect={isCorrect === true && selectedTrackId === track.trackId}
-            isWrong={isCorrect === false && selectedTrackId === track.trackId}
-          />
-        ))}
+        {shuffledTracks.map((track, idx) => {
+          const isHighlighted = highlightTrackIds?.includes(track.trackId);
+          const isCorrectAnswer = correctTrackId === track.trackId;
+
+          return (
+            <SpotifyCard
+              key={track.trackId}
+              track={track}
+              label={String.fromCharCode(65 + idx)} // A, B, C, D
+              onClick={() => onSelect(track.trackId)}
+              isSelected={selectedTrackId === track.trackId}
+              isCorrect={
+                isCorrect === true && selectedTrackId === track.trackId
+              }
+              isWrong={isCorrect === false && selectedTrackId === track.trackId}
+              isHighlighted={isHighlighted}
+              isCorrectAnswer={isCorrectAnswer}
+            />
+          );
+        })}
       </div>
     </div>
   );
