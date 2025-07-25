@@ -17,11 +17,6 @@ export default function MainGame({ gameId }: MainGameProps) {
     gameId: gameId as Id<"games">,
   });
 
-  const owner = useQuery(
-    api.users.getUserById,
-    gameData?.ownerId ? { userId: gameData.ownerId } : "skip"
-  );
-
   const [currentRound, setCurrentRound] = useState(0);
   const [lives, setLives] = useState(5);
   const [wrongCount, setWrongCount] = useState(0);

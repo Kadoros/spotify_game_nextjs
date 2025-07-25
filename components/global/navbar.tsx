@@ -4,7 +4,6 @@ import React from "react";
 import { useConvexAuth } from "convex/react";
 import { SignInButton, UserButton } from "@clerk/clerk-react";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const Navbar = () => {

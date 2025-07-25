@@ -17,7 +17,77 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 
 import { TrackObject } from "@/types";
 
-export function normalizeTrackObject(track: any): TrackObject {
+// Define interfaces for Spotify API response types
+interface SpotifyImage {
+  url: string;
+  height?: number | null;
+  width?: number | null;
+}
+
+interface SpotifyExternalUrls {
+  spotify?: string;
+}
+
+interface SpotifyAlbum {
+  album_type?: string;
+  total_tracks?: number;
+  available_markets?: string[];
+  external_urls?: SpotifyExternalUrls;
+  href?: string;
+  id?: string;
+  images?: SpotifyImage[];
+  name?: string;
+  release_date?: string;
+  release_date_precision?: string;
+  type?: string;
+  uri?: string;
+}
+
+interface SpotifyArtist {
+  external_urls?: SpotifyExternalUrls;
+  href?: string;
+  id?: string;
+  name?: string;
+  type?: string;
+  uri?: string;
+}
+
+interface SpotifyLinkedFrom {
+  external_urls?: SpotifyExternalUrls;
+  href?: string;
+  id?: string;
+  type?: string;
+  uri?: string;
+}
+
+interface SpotifyRestrictions {
+  reason?: string;
+}
+
+interface SpotifyTrackResponse {
+  album?: SpotifyAlbum;
+  artists?: SpotifyArtist[];
+  available_markets?: string[];
+  disc_number?: number;
+  duration_ms?: number;
+  explicit?: boolean;
+  external_ids?: Record<string, string>;
+  external_urls?: SpotifyExternalUrls;
+  href?: string;
+  id?: string;
+  is_playable?: boolean;
+  linked_from?: SpotifyLinkedFrom;
+  restrictions?: SpotifyRestrictions;
+  name?: string;
+  popularity?: number;
+  preview_url?: string | null;
+  track_number?: number;
+  type?: string;
+  uri?: string;
+  is_local?: boolean;
+}
+
+export function normalizeTrackObject(track: SpotifyTrackResponse): TrackObject {
   return {
     album: {
       album_type: track.album?.album_type || "unknown",
@@ -28,7 +98,7 @@ export function normalizeTrackObject(track: any): TrackObject {
       },
       href: track.album?.href || "",
       id: track.album?.id || "",
-      images: (track.album?.images || []).map((img: any) => ({
+      images: (track.album?.images || []).map((img: SpotifyImage) => ({
         url: img.url,
         height: img.height || null,
         width: img.width || null,
@@ -39,7 +109,7 @@ export function normalizeTrackObject(track: any): TrackObject {
       type: track.album?.type || "album",
       uri: track.album?.uri || "",
     },
-    artists: (track.artists || []).map((artist: any) => ({
+    artists: (track.artists || []).map((artist: SpotifyArtist) => ({
       external_urls: {
         spotify: artist.external_urls?.spotify || "",
       },
@@ -86,6 +156,6 @@ export function normalizeTrackObject(track: any): TrackObject {
   };
 }
 
-export function buildTrackObjectArray(rawTracks: any[]): TrackObject[] {
+export function buildTrackObjectArray(rawTracks: SpotifyTrackResponse[]): TrackObject[] {
   return rawTracks.map(normalizeTrackObject);
 }

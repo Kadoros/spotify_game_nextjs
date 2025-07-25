@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useSpotifyAuth } from "@/context/SpotifyAuthContext";
+import { useEffect } from "react";
+
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { TermAndRoundSelector } from "@/components/game/term-and-round-selector";
+
 import { useUser } from "@clerk/clerk-react";
 import { useMutation } from "convex/react";
 import { api } from "@/convex/_generated/api";

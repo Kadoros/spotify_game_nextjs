@@ -17,7 +17,7 @@ export default function CreateGamePage() {
   const { isLoading } = useConvexAuth();
 
   const [gameId, setGameId] = useState<string>("");
-  const [isCreating, setIsCreating] = useState(false); // <-- loading state
+  const [isCreating, setIsCreating] = useState(false);
 
   const userData = useQuery(api.users.getUser);
   const createGame = useMutation(api.games.createGame);
@@ -51,8 +51,6 @@ export default function CreateGamePage() {
 
         const data = await res.json();
 
-        console.log(data);
-
         if (!data.access_token) throw new Error("No access token returned");
 
         await updateToken({
@@ -61,7 +59,7 @@ export default function CreateGamePage() {
           expiresIn: data.expires_in,
         });
 
-        router.refresh(); // 상태 반영
+        router.refresh();
       } catch (err) {
         console.error("Failed to refresh token", err);
         toast.error("Spotify 인증이 만료되었습니다.");
@@ -95,7 +93,7 @@ export default function CreateGamePage() {
   const handleMake = useCallback(async (): Promise<void> => {
     if (isLoading || userData === undefined || !accessToken) return;
 
-    setIsCreating(true); // start loading
+    setIsCreating(true);
 
     const termMap: Record<
       "short" | "middle" | "long",
@@ -107,6 +105,11 @@ export default function CreateGamePage() {
     };
 
     try {
+      if (rounds < 1 || lives < 1) {
+        toast.error("Rounds and Lives must be at least 1");
+        return;
+      }
+
       const topTracks = await getTopTracks(
         accessToken,
         rounds,
@@ -166,11 +169,16 @@ export default function CreateGamePage() {
 
       const newGameId = await createGame({ trackGroups, lives });
       setGameId(newGameId);
-    } catch (err: any) {
-      console.error("Failed to create game:", err);
-      toast.error(err.message || "Error creating game. Try again.");
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        console.error("Failed to create game:", err.message);
+        toast.error(err.message || "Error creating game. Try again.");
+      } else {
+        console.error("Unknown error:", err);
+        toast.error("Error creating game. Try again.");
+      }
     } finally {
-      setIsCreating(false); // stop loading
+      setIsCreating(false);
     }
   }, [
     rounds,
@@ -214,6 +222,8 @@ export default function CreateGamePage() {
     );
   }
 
+  const terms: ("short" | "middle" | "long")[] = ["short", "middle", "long"];
+
   return (
     <div className="max-w-xl mx-auto mt-10 p-6 rounded-2xl backdrop-blur-md bg-white/5 border border-white/10 shadow-lg text-white space-y-6">
       <h1 className="text-2xl font-bold text-center">Create Your Game</h1>
@@ -245,10 +255,10 @@ export default function CreateGamePage() {
           <div className="space-y-2">
             <Label>Time Range</Label>
             <div className="flex gap-2 flex-wrap">
-              {["short", "middle", "long"].map((term) => (
+              {terms.map((term) => (
                 <Button
                   key={term}
-                  onClick={() => setActiveTerm(term as any)}
+                  onClick={() => setActiveTerm(term)}
                   className={`capitalize px-4 py-2 rounded-md text-white transition border min-w-0 ${
                     activeTerm === term
                       ? "bg-black/40 border-white/40 ring-2 ring-white/40"

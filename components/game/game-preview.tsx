@@ -73,10 +73,6 @@ export default function MainGamePreview({ gameId }: MainGamePreviewProps) {
     }
   }
 
-  function handleCopy() {
-    navigator.clipboard.writeText(shareUrl);
-  }
-
   if (gameData === undefined || roundTracks === undefined) {
     return (
       <div className="flex items-center justify-center p-8 h-64">

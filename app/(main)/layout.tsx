@@ -1,19 +1,7 @@
 "use client";
 
 import React from "react";
-import Link from "next/link";
-import { useSpotifyAuth } from "@/context/SpotifyAuthContext"; // ✅ new path
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
+
 import Navbar from "@/components/global/navbar";
 
 const MainLayout = ({ children }: { children: React.ReactNode }) => {
