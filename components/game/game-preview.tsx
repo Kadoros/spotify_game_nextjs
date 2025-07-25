@@ -21,7 +21,6 @@ export default function MainGamePreview({ gameId }: MainGamePreviewProps) {
 
   const [currentRound, setCurrentRound] = useState(0);
   const [selectedTrackId, setSelectedTrackId] = useState<string | null>(null);
-  const [shareUrl, setShareUrl] = useState("");
 
   const currentTrackGroup = gameData?.trackGroups?.[currentRound];
 
@@ -49,11 +48,6 @@ export default function MainGamePreview({ gameId }: MainGamePreviewProps) {
         toast.error("Failed to copy link");
       });
   }, [gameId]);
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      setShareUrl(window.location.href);
-    }
-  }, []);
 
   function handleSelect(trackId: string) {
     setSelectedTrackId(trackId);
